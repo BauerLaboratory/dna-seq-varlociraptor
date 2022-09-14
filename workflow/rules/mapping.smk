@@ -10,7 +10,7 @@ rule map_reads:
         extra=get_read_group,
         sorting="samtools",
         sort_order="coordinate",
-    threads: 8
+    threads: workflow.cores * 0.95
     wrapper:
         "v1.4.0/bio/bwa/mem"
 
@@ -123,7 +123,7 @@ rule recalibrate_base_qualities:
         java_opts="",
     log:
         "logs/gatk/baserecalibrator/{sample}.log",
-    threads: 8
+    threads: workflow.cores * 0.95
     wrapper:
         "v1.2.0/bio/gatk/baserecalibratorspark"
 
@@ -146,6 +146,6 @@ rule apply_bqsr:
         "logs/gatk/gatk_applybqsr/{sample}.log",
     params:
         extra=config["params"]["gatk"]["applyBQSR"],  # optional
-        java_opts="",  # optional
+        java_opts="-Dsamjdk.compression_level=9",  # optional
     wrapper:
         "v1.2.0/bio/gatk/applybqsr"

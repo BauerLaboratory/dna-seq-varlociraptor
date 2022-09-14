@@ -12,7 +12,7 @@ ref:
   # Ensembl species name
   species: homo_sapiens
   # Ensembl release
-  release: 105
+  release: 106
   # Genome build
   build: GRCh38
   # Optionally, instead of downloading the whole reference from Ensembl via the 
@@ -22,10 +22,10 @@ ref:
 
 primers:
   trimming:
-    activate: false
+    activate: true
     # path to fasta files containg primer sequences
-    primers_fa1: "path/to/primer-fa1"
-    primers_fa2: "path/to/primer-fa2"
+    primers_fa1: "config/panel_primer.1.fa"
+    primers_fa2: "config/panel_primer.2.fa"
     # optional primer file allowing to define primers per sample
     # overwrites primers_fa1 and primers_fa2
     # the tsv file requires three fields: panel, fa1 and fa2 (optional)
@@ -69,7 +69,7 @@ calling:
     # Annotation of candidate variants tries to be as fast as possible, only using VEP
     # default parameters. Comment out or remove if not needed or intended.
     # See https://github.com/vembrane/vembrane
-    candidates: "ANN['IMPACT'] != 'LOW'"
+    # candidates: "ANN['IMPACT'] != 'LOW'"
     # Add any number of named filters here (replace myfilter with a reasonable name, 
     # and add more below). Filtering happens with the vembrane filter language
     # (see https://github.com/vembrane/vembrane), and you can refer to any fields that
@@ -78,7 +78,7 @@ calling:
     # Filters will be applied independenty, and can be referred in FDR control below
     # to generate calls for different events.
     # You can for example filter by ANN fields, ID or dbsnp annotations here.
-    impact_filter: "ANN['IMPACT'] == 'HIGH'"
+    moderate_high: "any(entry in ANN['IMPACT'] for entry in ('HIGH','MODERATE'))"
     # If you need to use vembrane command line options beyond the filter expression,
     # please use the filter sub-structure with 'expression:' for the filter expression
     # and "aux-files:" for additional files with IDs for filtering. This can for example 
@@ -86,9 +86,9 @@ calling:
     gene_list_filter:
       aux-files:
         super_interesting_genes: "config/super_interesting_genes.tsv"
-      expression: "ANN['GENE'] in AUX['super_interesting_genes']"
+      expression: "ANN['SYMBOL'] in AUX['super_interesting_genes']"
   fdr-control:
-    threshold: 0.05
+    threshold: 0.01
     # denote whether local or global FDR shall be controlled
     local: true
     events: 
@@ -96,34 +96,32 @@ calling:
       # The id of each event can be chosen freely, but needs to contain
       # only alphanumerics and underscores
       # ("somatic" below is just an example and can be modified as needed).
-      some_id:
+      ctDNA:
         # labels for the callset, displayed in the report. Will fall back to id if no labels specified
         labels:
-          some-label: label text
-          other-label: label text
+          events: ctDNA
         # optional subcategory for callset (e.g. "known variants", or "VUS"),
         # comment out or remove to disable
-        subcategory: some subcategory
+        # subcategory: some subcategory
         # Natural language description of the callset obtained here.
         # This will occur in the report.
         desc: |
-          Some description.
+          Analysis of cell-free circulating tumor DNA (ctDNA). 
         varlociraptor: 
           # Add varlociraptor events to aggregated over.
           # The probability for the union of these events is used for controlling
           # the FDR.
-          - somatic_tumor_high
-          - somatic_tumor_medium
+          - "HIGH"
         filter: # myfilter
           # Add any number of filters here.
           # A single filter can be set as string.
           # Multiple filters can be defined as list and will be concatenated by 'and'
-          - impact_filter
+          - moderate_high
           - gene_list_filter
 
 # If calc_consensus_reads is activated duplicates will be merged
 remove_duplicates:
-  activate: true
+  activate: false
 
 # Experimental: calculate consensus reads from PCR duplicates.
 # if 'remove_duplicates' is deactivate only overlapping pairs will be merged
@@ -136,7 +134,8 @@ annotations:
     # annotate with known variants from ensembl
     known: resources/variation.vcf.gz
     # add more external VCFs as needed
-    # cosmic: path/to/cosmic.vcf.gz
+    cosmic: resources/CosmicCodingMuts_hg38_v94.vcf.gz
+    clin_var: resources/clinvar_20220425.vcf.gz
   dgidb:
     # annotate variants with drug interactions of affected genes
     activate: false
@@ -156,7 +155,7 @@ annotations:
 
 # printing of variants in a table format (might be deprecated soon)
 tables:
-  activate: false
+  activate: true
   output:
     # Uncomment and add VEP annotation fields to include (IMPACT, Consequence, Feature, SYMBOL, and HGVSp are always included)
     annotation_fields:
@@ -164,7 +163,7 @@ tables:
       - CLIN_SIG
     event_prob: true
     observations: true
-  generate_excel: true
+  generate_excel: false
 
 params:
   cutadapt: ""
@@ -179,9 +178,10 @@ params:
     # which might be misleading because all reads of an amplicon have the same start
     # position, strand etc. (--omit-strand-bias, --omit-read-position-bias, 
     # --omit-softclip-bias, --omit-read-orientation-bias).
-    call: ""
+    call: "--omit-strand-bias --omit-read-position-bias --omit-softclip-bias --omit-read-orientation-bias"
     # Add extra arguments for varlociraptor preprocess. By default, we limit the depth to 200.
     # Increase this value for panel sequencing!
-    preprocess: "--max-depth 200"
+    preprocess: "--max-depth 100000"
   freebayes:
-    min_alternate_fraction: 0.05 # Reduce for calling variants with lower VAFs
+    min_alternate_fraction: 0.005 # Reduce for calling variants with lower VAFs
+  delly: "-q 20 -s 15 -z 5"
